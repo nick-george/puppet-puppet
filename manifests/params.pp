@@ -22,17 +22,6 @@ class puppet::params {
   $agent_noop          = false
   $show_diff           = false
   $module_repository   = undef
-  if versioncmp($::puppetversion, '4.0') < 0 {
-    $configtimeout           = 120
-    $server_puppetserver_dir = '/etc/puppetserver'
-    $server_ruby_load_paths  = []
-    $server_jruby_gem_home   = '/var/lib/puppet/jruby-gems'
-  } else {
-    $configtimeout           = undef
-    $server_puppetserver_dir = '/etc/puppetlabs/puppetserver'
-    $server_ruby_load_paths  = ['/opt/puppetlabs/puppet/lib/ruby/vendor_ruby']
-    $server_jruby_gem_home   = '/opt/puppetlabs/server/data/puppetserver/jruby-gems'
-  }
   if versioncmp($::puppetversion, '4.0') < 0 or versioncmp($::puppetversion, '4.5') >= 0 {
     $hiera_config            = '$confdir/hiera.yaml'
   } else {
@@ -53,68 +42,97 @@ class puppet::params {
   $classfile           = '$statedir/classes.txt'
   $syslogfacility      = undef
   $environment         = $::environment
+
   if versioncmp($::puppetversion, '4.0') < 0 {
-    $aio_package = false
+    $aio_package      = false
+    $deb_naio_package = false
   } elsif $::osfamily == 'Windows' or $::rubysitedir =~ /\/opt\/puppetlabs\/puppet/ {
-    $aio_package = true
+    $aio_package      = true
+    $deb_naio_package = false
   } else {
-    $aio_package = false
+    $aio_package      = false
+    $deb_naio_package = ($::osfamily == 'Debian')
   }
 
   case $::osfamily {
     'Windows' : {
       # Windows prefixes normal paths with the Data Directory's path and leaves 'puppet' off the end
-      $dir_prefix        = 'C:/ProgramData/PuppetLabs/puppet'
-      $dir               = "${dir_prefix}/etc"
-      $codedir           = "${dir_prefix}/etc"
-      $logdir            = "${dir_prefix}/var/log"
-      $rundir            = "${dir_prefix}/var/run"
-      $ssldir            = "${dir_prefix}/etc/ssl"
-      $vardir            = "${dir_prefix}/var"
-      $sharedir          = "${dir_prefix}/share"
-      $bindir            = "${dir_prefix}/bin"
-      $root_group        = undef
+      $dir_prefix                 = 'C:/ProgramData/PuppetLabs/puppet'
+      $dir                        = "${dir_prefix}/etc"
+      $codedir                    = "${dir_prefix}/etc"
+      $logdir                     = "${dir_prefix}/var/log"
+      $rundir                     = "${dir_prefix}/var/run"
+      $ssldir                     = "${dir_prefix}/etc/ssl"
+      $vardir                     = "${dir_prefix}/var"
+      $sharedir                   = "${dir_prefix}/share"
+      $bindir                     = "${dir_prefix}/bin"
+      $root_group                 = undef
+      $server_puppetserver_dir    = undef
+      $server_puppetserver_vardir = undef
+      $server_ruby_load_paths     = []
+      $server_jruby_gem_home      = undef
     }
 
     /^(FreeBSD|DragonFly)$/ : {
-      $dir               = '/usr/local/etc/puppet'
-      $codedir           = '/usr/local/etc/puppet'
-      $logdir            = '/var/log/puppet'
-      $rundir            = '/var/run/puppet'
-      $ssldir            = '/var/puppet/ssl'
-      $vardir            = '/var/puppet'
-      $sharedir          = '/usr/local/share/puppet'
-      $bindir            = '/usr/local/bin'
-      $root_group        = undef
+      $dir                        = '/usr/local/etc/puppet'
+      $codedir                    = '/usr/local/etc/puppet'
+      $logdir                     = '/var/log/puppet'
+      $rundir                     = '/var/run/puppet'
+      $ssldir                     = '/var/puppet/ssl'
+      $vardir                     = '/var/puppet'
+      $sharedir                   = '/usr/local/share/puppet'
+      $bindir                     = '/usr/local/bin'
+      $root_group                 = undef
+      $server_puppetserver_dir    = undef
+      $server_puppetserver_vardir = '/var/puppet'
+      $server_ruby_load_paths     = []
+      $server_jruby_gem_home      = undef
     }
 
     default : {
       if $aio_package {
-        $dir               = '/etc/puppetlabs/puppet'
-        $codedir           = '/etc/puppetlabs/code'
-        $logdir            = '/var/log/puppetlabs/puppet'
-        $rundir            = '/var/run/puppetlabs'
-        $ssldir            = '/etc/puppetlabs/puppet/ssl'
-        $vardir            = '/opt/puppetlabs/puppet/cache'
-        $sharedir          = '/opt/puppetlabs/puppet'
-        $bindir            = '/opt/puppetlabs/bin'
+        $dir                        = '/etc/puppetlabs/puppet'
+        $codedir                    = '/etc/puppetlabs/code'
+        $logdir                     = '/var/log/puppetlabs/puppet'
+        $rundir                     = '/var/run/puppetlabs'
+        $ssldir                     = '/etc/puppetlabs/puppet/ssl'
+        $vardir                     = '/opt/puppetlabs/puppet/cache'
+        $sharedir                   = '/opt/puppetlabs/puppet'
+        $bindir                     = '/opt/puppetlabs/bin'
+        $server_puppetserver_dir    = '/etc/puppetlabs/puppetserver'
+        $server_puppetserver_vardir = '/opt/puppetlabs/server/data/puppetserver'
+        $server_ruby_load_paths     = ['/opt/puppetlabs/puppet/lib/ruby/vendor_ruby']
+        $server_jruby_gem_home      = '/opt/puppetlabs/server/data/puppetserver/jruby-gems'
       } else {
-        $dir               = '/etc/puppet'
-        $codedir           = '/etc/puppet'
-        $logdir            = '/var/log/puppet'
-        $rundir            = '/var/run/puppet'
-        $ssldir            = '/var/lib/puppet/ssl'
-        $vardir            = '/var/lib/puppet'
-        $sharedir          = '/usr/share/puppet'
-        $bindir            = '/usr/bin'
+        $dir                        = '/etc/puppet'
+        $codedir                    =  $deb_naio_package ? {
+          true  => '/etc/puppet/code',
+          false => '/etc/puppet',
+        }
+        $logdir                     = '/var/log/puppet'
+        $rundir                     = '/var/run/puppet'
+        $ssldir                     = '/var/lib/puppet/ssl'
+        $vardir                     = '/var/lib/puppet'
+        $sharedir                   = '/usr/share/puppet'
+        $bindir                     = '/usr/bin'
+        $server_puppetserver_dir    = '/etc/puppetserver'
+        $server_puppetserver_vardir = $vardir
+        $server_ruby_load_paths     = []
+        $server_jruby_gem_home      = '/var/lib/puppet/jruby-gems'
       }
       $root_group = undef
     }
   }
 
+  if versioncmp($::puppetversion, '4.0') < 0 {
+    $configtimeout = 120
+  } else {
+    $configtimeout = undef
+  }
+
   $autosign         = "${dir}/autosign.conf"
+  $autosign_entries = []
   $autosign_mode    = '0664'
-  $autosign_content = undef
 
   $puppet_cmd = "${bindir}/puppet"
 
@@ -222,6 +240,7 @@ class puppet::params {
   $server_environments_mode    = '0755'
   # Where we store our puppet environments
   $server_envs_dir             = "${codedir}/environments"
+  $server_envs_target          = undef
   # Modules in this directory would be shared across all environments
   $server_common_modules_path  = ["${server_envs_dir}/common", "${codedir}/modules", "${sharedir}/modules"]
 
@@ -259,7 +278,10 @@ class puppet::params {
   if $aio_package {
     $client_package = ['puppet-agent']
   } elsif ($::osfamily == 'Debian') {
-    $client_package = ['puppet-common','puppet']
+    $client_package = $deb_naio_package ? {
+      true    => ['puppet-agent', 'puppet'],
+      default => ['puppet-common', 'puppet']
+    }
   } elsif ($::osfamily =~ /(FreeBSD|DragonFly)/) {
     if (versioncmp($::puppetversion, '4.0') > 0) {
       $client_package = ['puppet4']
@@ -274,7 +296,10 @@ class puppet::params {
   $puppetca_cmd  = "${puppet_cmd} cert"
 
   # Puppet service name
-  $service_name = 'puppet'
+  $service_name = $deb_naio_package ? {
+    true    => 'puppet-agent',
+    default => 'puppet'
+  }
   # Puppet onedshot systemd service and timer name
   $systemd_unit_name = 'puppet-run'
   # Mechanisms to manage and reload/restart the agent
@@ -352,8 +377,8 @@ class puppet::params {
   $server_connect_timeout          = 120000
   $server_enable_ruby_profiler     = false
   $server_ca_auth_required         = true
-  $server_admin_api_whitelist      = [ '127.0.0.1', '::1', $::ipaddress ]
-  $server_ca_client_whitelist      = [ '127.0.0.1', '::1', $::ipaddress ]
+  $server_admin_api_whitelist      = [ 'localhost', $lower_fqdn ]
+  $server_ca_client_whitelist      = [ 'localhost', $lower_fqdn ]
   $server_cipher_suites            = [ 'TLS_RSA_WITH_AES_256_CBC_SHA256', 'TLS_RSA_WITH_AES_256_CBC_SHA', 'TLS_RSA_WITH_AES_128_CBC_SHA256', 'TLS_RSA_WITH_AES_128_CBC_SHA', ]
   $server_ssl_protocols            = [ 'TLSv1.2', ]
 
@@ -361,5 +386,5 @@ class puppet::params {
   $server_use_legacy_auth_conf     = false
 
   # For puppetserver 2, certain configuration parameters are version specific. We assume a particular version here.
-  $server_puppetserver_version     = '2.4.99'
+  $server_puppetserver_version     = '2.6.0'
 }

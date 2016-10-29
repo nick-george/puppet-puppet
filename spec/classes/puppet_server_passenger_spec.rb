@@ -25,10 +25,24 @@ describe 'puppet::server::passenger' do
 
       let(:default_params) do {
         :app_root => '/etc/puppet/rack',
+        :confdir => '/etc/puppet',
+        :vardir => '/var/lib/puppet',
         :passenger_pre_start => true,
         :passenger_min_instances => 12,
+        :passenger_ruby => '/usr/bin/tfm-ruby',
         :port => 8140,
+        :http => false,
         :http_port => 8139,
+        :http_allow => [],
+        :ssl_cert => 'cert.pem',
+        :ssl_cert_key => 'key.pem',
+        :ssl_ca_cert => 'ca.pem',
+        :ssl_ca_crl => false,
+        :ssl_chain => 'ca.pem',
+        :ssl_dir => 'ssl/',
+        :puppet_ca_proxy => '',
+        :rack_arguments => [],
+        :user => 'puppet',
       } end
 
       describe 'without parameters' do
@@ -49,6 +63,13 @@ describe 'puppet::server::passenger' do
         end
 
         it 'should include the puppet vhost' do
+          should contain_apache__vhost('puppet').with({
+            :ssl_proxyengine => true,
+            :custom_fragment => "ProxyPassMatch ^/([^/]+/certificate.*)$ https://ca.example.org:8140/$1",
+          })
+        end
+
+        it 'should include the puppet http vhost' do
           should contain_apache__vhost('puppet').with({
             :ssl_proxyengine => true,
             :custom_fragment => "ProxyPassMatch ^/([^/]+/certificate.*)$ https://ca.example.org:8140/$1",
@@ -86,6 +107,7 @@ describe 'puppet::server::passenger' do
             :passenger_min_instances => 10,
             :passenger_pre_start     => 'https://puppet.example.com:8140',
             :passenger_ruby          => '/opt/ruby2.0/bin/ruby',
+            :ssl_proxyengine         => false,
           })
         end
 
@@ -94,6 +116,7 @@ describe 'puppet::server::passenger' do
             :passenger_min_instances => 10,
             :passenger_pre_start     => 'http://puppet.example.com:8139',
             :passenger_ruby          => '/opt/ruby2.0/bin/ruby',
+            :ssl_proxyengine         => false,
           })
         end
       end

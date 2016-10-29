@@ -15,42 +15,49 @@ describe 'puppet::server::config' do
       }) end
 
       if Puppet.version < '4.0'
-        codedir          = '/etc/puppet'
-        conf_file        = '/etc/puppet/puppet.conf'
-        environments_dir = '/etc/puppet/environments'
-        logdir           = '/var/log/puppet'
-        rundir           = '/var/run/puppet'
-        vardir           = '/var/lib/puppet'
-        ssldir           = '/var/lib/puppet/ssl'
-        sharedir         = '/usr/share/puppet'
-        etcdir           = '/etc/puppet'
-        puppetcacmd      = '/usr/bin/puppet cert'
-        additional_facts = {}
+        codedir             = '/etc/puppet'
+        confdir             = '/etc/puppet'
+        conf_file           = '/etc/puppet/puppet.conf'
+        environments_dir    = '/etc/puppet/environments'
+        logdir              = '/var/log/puppet'
+        rundir              = '/var/run/puppet'
+        vardir              = '/var/lib/puppet'
+        puppetserver_vardir = '/var/lib/puppet'
+        ssldir              = '/var/lib/puppet/ssl'
+        sharedir            = '/usr/share/puppet'
+        etcdir              = '/etc/puppet'
+        puppetcacmd         = '/usr/bin/puppet cert'
+        additional_facts    = {}
       else
-        codedir          = '/etc/puppetlabs/code'
-        conf_file        = '/etc/puppetlabs/puppet/puppet.conf'
-        environments_dir = '/etc/puppetlabs/code/environments'
-        logdir           = '/var/log/puppetlabs/puppet'
-        rundir           = '/var/run/puppetlabs'
-        vardir           = '/opt/puppetlabs/puppet/cache'
-        ssldir           = '/etc/puppetlabs/puppet/ssl'
-        sharedir         = '/opt/puppetlabs/puppet'
-        etcdir           = '/etc/puppetlabs/puppet'
-        puppetcacmd      = '/opt/puppetlabs/bin/puppet cert'
-        additional_facts = {:rubysitedir => '/opt/puppetlabs/puppet/lib/ruby/site_ruby/2.1.0'}
+        codedir             = '/etc/puppetlabs/code'
+        confdir             = '/etc/puppetlabs/puppet'
+        conf_file           = '/etc/puppetlabs/puppet/puppet.conf'
+        environments_dir    = '/etc/puppetlabs/code/environments'
+        logdir              = '/var/log/puppetlabs/puppet'
+        rundir              = '/var/run/puppetlabs'
+        vardir              = '/opt/puppetlabs/puppet/cache'
+        puppetserver_vardir = '/opt/puppetlabs/server/data/puppetserver'
+        ssldir              = '/etc/puppetlabs/puppet/ssl'
+        sharedir            = '/opt/puppetlabs/puppet'
+        etcdir              = '/etc/puppetlabs/puppet'
+        puppetcacmd         = '/opt/puppetlabs/bin/puppet cert'
+        additional_facts    = {:rubysitedir => '/opt/puppetlabs/puppet/lib/ruby/site_ruby/2.1.0'}
       end
 
       if os_facts[:osfamily] == 'FreeBSD'
-        codedir          = '/usr/local/etc/puppet'
-        conf_file        = '/usr/local/etc/puppet/puppet.conf'
-        environments_dir = '/usr/local/etc/puppet/environments'
-        logdir           = '/var/log/puppet'
-        rundir           = '/var/run/puppet'
-        vardir           = '/var/puppet'
-        ssldir           = '/var/puppet/ssl'
-        sharedir         = '/usr/local/share/puppet'
-        etcdir           = '/usr/local/etc/puppet'
-        puppetcacmd      = '/usr/local/bin/puppet cert'
+        codedir             = '/usr/local/etc/puppet'
+        confdir             = '/usr/local/etc/puppet'
+        conf_file           = '/usr/local/etc/puppet/puppet.conf'
+        environments_dir    = '/usr/local/etc/puppet/environments'
+        logdir              = '/var/log/puppet'
+        rundir              = '/var/run/puppet'
+        vardir              = '/var/puppet'
+        puppetserver_vardir = '/var/puppet'
+        ssldir              = '/var/puppet/ssl'
+        sharedir            = '/usr/local/share/puppet'
+        etcdir              = '/usr/local/etc/puppet'
+        puppetcacmd         = '/usr/local/bin/puppet cert'
+        additional_facts    = {}
       end
 
       let(:facts) { default_facts.merge(additional_facts) }
@@ -83,13 +90,13 @@ describe 'puppet::server::config' do
           })
         end
 
-        context 'with non-AIO packages', :if => (Puppet.version < '4.0') do
+        context 'with non-AIO packages', :if => (Puppet.version < '4.0' || os_facts[:osfamily] == 'FreeBSD') do
           it 'CA cert generation should notify the Apache service' do
             should contain_exec('puppet_server_config-generate_ca_cert').that_notifies('Service[httpd]')
           end
         end
 
-        context 'with AIO packages', :if => (Puppet.version > '4.0') do
+        context 'with AIO packages', :if => (Puppet.version > '4.0' && os_facts[:osfamily] != 'FreeBSD') do
           it 'CA cert generation should notify the puppetserver service' do
             should contain_exec('puppet_server_config-generate_ca_cert').that_notifies('Service[puppetserver]')
           end
@@ -106,7 +113,7 @@ describe 'puppet::server::config' do
           should contain_class('foreman::puppetmaster').with({
             :foreman_url    => "https://puppetmaster.example.com",
             :receive_facts  => true,
-            :puppet_home    => vardir,
+            :puppet_home    => puppetserver_vardir,
             :puppet_etcdir  => etcdir,
             # Since this is managed inside the foreman module it does not
             # make sense to test it here
@@ -230,6 +237,35 @@ describe 'puppet::server::config' do
           should contain_concat__fragment('puppet.conf+30-master').
             with_content(/^\s+autosign\s+= \/somedir\/custom_autosign { mode = 664 }$/).
             with({}) # So we can use a trailing dot on each with_content line
+        end
+      end
+
+      describe "when autosign_entries is not set" do
+        let :pre_condition do
+          "class {'puppet':
+              server  => true,
+           }"
+        end
+
+        it 'should contain autosign.conf with out content set' do
+           should contain_file("#{confdir}/autosign.conf")
+           should_not contain_file("#{confdir}/autosign.conf").with_content(/# Managed by Puppet/)
+           should_not contain_file("#{confdir}/autosign.conf").with_content(/foo.bar/)
+        end
+      end
+
+      describe "when autosign_entries set to ['foo.bar']" do
+        let :pre_condition do
+          "class {'puppet':
+              server           => true,
+              autosign_entries => ['foo.bar'],
+           }"
+        end
+
+        it 'should contain autosign.conf with content set' do
+           should contain_file("#{confdir}/autosign.conf")
+           should contain_file("#{confdir}/autosign.conf").with_content(/# Managed by Puppet/)
+           should contain_file("#{confdir}/autosign.conf").with_content(/foo.bar/)
         end
       end
 

@@ -11,6 +11,11 @@
 #                              sure that script considers the content of autosign.conf
 #                              as otherwise Foreman functionality might be broken.
 #
+# $autosign_entries::          A list of certnames or domain name globs
+#                              whose certificate requests will automatically be signed.
+#                              Defaults to an empty Array.
+#                              type: array
+#
 # $autosign_mode::             mode of the autosign file/script
 #
 # $autosign_content::          If set, write the autosign file content
@@ -105,6 +110,10 @@
 #                              type:string
 #
 # $envs_dir::                  Directory that holds puppet environments
+#                              type:string
+#
+# $envs_target::               Indicates that $envs_dir should be
+#                              a symbolic link to this target
 #                              type:string
 #
 # $common_modules_path::       Common modules paths (only when
@@ -304,6 +313,9 @@
 #                              disable in case CA is delegated to a separate instance
 #                              type:boolean
 #
+# $puppetserver_vardir::       The path of the puppetserver var dir
+#                              type:string
+#
 # $puppetserver_dir::          The path of the puppetserver config dir
 #                              type:string
 #
@@ -362,6 +374,7 @@
 
 class puppet::server(
   $autosign                 = $::puppet::autosign,
+  $autosign_entries         = $::puppet::autosign_entries,
   $autosign_mode            = $::puppet::autosign_mode,
   $autosign_content         = $::puppet::autosign_content,
   $hiera_config             = $::puppet::hiera_config,
@@ -380,6 +393,7 @@ class puppet::server(
   $reports                  = $::puppet::server_reports,
   $implementation           = $::puppet::server_implementation,
   $passenger                = $::puppet::server_passenger,
+  $puppetserver_vardir      = $::puppet::server_puppetserver_vardir,
   $puppetserver_dir         = $::puppet::server_puppetserver_dir,
   $puppetserver_version     = $::puppet::server_puppetserver_version,
   $service_fallback         = $::puppet::server_service_fallback,
@@ -405,6 +419,7 @@ class puppet::server(
   $environments_group       = $::puppet::server_environments_group,
   $environments_mode        = $::puppet::server_environments_mode,
   $envs_dir                 = $::puppet::server_envs_dir,
+  $envs_target              = $::puppet::server_envs_target,
   $common_modules_path      = $::puppet::server_common_modules_path,
   $git_repo_mode            = $::puppet::server_git_repo_mode,
   $git_repo_path            = $::puppet::server_git_repo_path,
@@ -489,6 +504,7 @@ class puppet::server(
   if ! is_bool($autosign) {
     validate_absolute_path($autosign)
     validate_string($autosign_mode)
+    validate_array($autosign_entries)
   }
 
   if $autosign_content {
@@ -508,6 +524,7 @@ class puppet::server(
     validate_re($jvm_min_heap_size, '^[0-9]+[kKmMgG]$')
     validate_re($jvm_max_heap_size, '^[0-9]+[kKmMgG]$')
     validate_absolute_path($puppetserver_dir)
+    validate_absolute_path($puppetserver_vardir)
     validate_absolute_path($jruby_gem_home)
     validate_integer($max_active_instances)
     validate_integer($idle_timeout)

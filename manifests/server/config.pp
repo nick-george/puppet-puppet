@@ -129,6 +129,11 @@ class puppet::server::config inherits puppet::config {
         mode   => $puppet::autosign_mode,
       }
     }
+    if !empty($puppet::autosign_entries) {
+      File[$puppet::autosign] {
+        content => template('puppet/server/autosign.conf.erb'),
+      }
+    }
   }
 
   # only manage this file if we provide content
@@ -144,11 +149,19 @@ class puppet::server::config inherits puppet::config {
 
   ## Environments
   # location where our puppet environments are located
+  if $::puppet::server::envs_target and $::puppet::server::envs_target != '' {
+    $ensure = 'link'
+  } else {
+    $ensure = 'directory'
+  }
+
   file { $::puppet::server::envs_dir:
-    ensure => directory,
+    ensure => $ensure,
     owner  => $::puppet::server::environments_owner,
     group  => $::puppet::server::environments_group,
     mode   => $::puppet::server::environments_mode,
+    target => $::puppet::server::envs_target,
+    force  => true,
   }
 
   if $::puppet::server::git_repo {
@@ -203,7 +216,7 @@ class puppet::server::config inherits puppet::config {
     class {'::foreman::puppetmaster':
       foreman_url    => $::puppet::server::foreman_url,
       receive_facts  => $::puppet::server::server_facts,
-      puppet_home    => $puppet::vardir,
+      puppet_home    => $::puppet::server::puppetserver_vardir,
       puppet_basedir => $::puppet::server::puppet_basedir,
       puppet_etcdir  => $puppet::dir,
       enc_api        => $::puppet::server::enc_api,
